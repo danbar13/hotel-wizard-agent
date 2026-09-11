@@ -97,6 +97,13 @@ function systemPrompt(customerName) {
 
 **כותב בשפה אחרת** — ענה באותה שפה.
 
+## עדכון בעל העסק
+יש לך כלי בשם notify_owner ששולח לבעל העסק הודעה קצרה. קרא לו **רק** בשני מקרים:
+1. חיפשת בכלים הרלוונטיים (מאגר ידע, מלאי, הזמנות) ולא מצאת תשובה, והפנית את הלקוח לבעל העסק.
+2. הלקוח ביקש במפורש שיחזרו אליו, או השאיר פרטים ליצירת קשר (שם, טלפון אחר, שעות נוחות).
+
+קרא לכלי **באותו סבב שבו אתה עונה ללקוח**, לפני שאתה כותב את התשובה הסופית — ההודעה לבעל העסק נשלחת אוטומטית רק אחרי שהלקוח קיבל את התשובה שלך, אז הלקוח לא נשאר בלי מענה. אל תקרא לו על שאלות שענית עליהן, על הפניות שגרתיות (הנחה, ביטול הזמנה, שאלה רפואית), ולא יותר מפעם אחת לאותו עניין בשיחה. אל תספר ללקוח שהעברת הודעה — פשוט תגיד שבעל העסק יחזור אליו.
+
 ## מצב לא מוכר
 אם נתקלת במצב שלא כתוב כאן, אל תיתקע ואל תמציא נוהל. **תתנהג כמו מוכר טוב בחנות:** תגיד בפשטות מה אתה יודע ומה לא, תבדוק בכלים מה שאפשר לבדוק, תציע את הצעד הבא הכי הגיוני, ואם זה מעבר לסמכות שלך — תפנה לבעל העסק בשם ובטלפון. עדיף להודות שאתה לא בטוח מאשר לתת תשובה שנשמעת טוב ולא נכונה.
 
@@ -143,7 +150,7 @@ async function callModel(messages) {
  * `history` is the prior conversation for this contact (not mutated).
  */
 export async function answer({ text, senderPhone, history = [] }) {
-  const executors = buildExecutors(senderPhone);
+  const { executors, afterReply } = buildExecutors(senderPhone);
   // Greeting a returning customer by name is the cheapest bit of humanity we
   // can add. The orders sheet is cached, so this costs nothing extra.
   const customerName = await lookupCustomerName(senderPhone).catch(() => null);
@@ -160,7 +167,7 @@ export async function answer({ text, senderPhone, history = [] }) {
 
     const calls = message.tool_calls || [];
     if (!calls.length) {
-      return { reply: message.content?.trim() || '', messages };
+      return { reply: message.content?.trim() || '', messages, afterReply };
     }
 
     // Every tool_call id must come back with a matching tool message, including
@@ -190,5 +197,6 @@ export async function answer({ text, senderPhone, history = [] }) {
       `לא הצלחתי להשלים את הבדיקה. עדיף לבדוק את זה מול ${config.business.ownerName}` +
       (config.business.ownerPhone ? ` בטלפון ${config.business.ownerPhone}.` : '.'),
     messages,
+    afterReply,
   };
 }

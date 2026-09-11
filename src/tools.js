@@ -1,5 +1,6 @@
 import config from './config.js';
 import { getKnowledgeText, getSheetRows } from './data/google.js';
+import { sendMessage } from './green-api.js';
 
 /**
  * Tool schemas handed to the model. Descriptions are prescriptive about *when*
@@ -55,6 +56,32 @@ export const toolSchemas = [
           },
         },
         required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'notify_owner',
+      description:
+        'שולח לבעל העסק הודעת וואטסאפ קצרה על לקוח שצריך את תשומת לבו. ' +
+        'קרא לכלי הזה רק בשני מקרים: (1) לא מצאת תשובה באף מקור — לא במאגר הידע, לא במלאי ולא בהזמנות — ' +
+        'והפנית את הלקוח לבעל העסק; (2) הלקוח ביקש במפורש שיחזרו אליו או השאיר פרטים ליצירת קשר. ' +
+        'קרא לו רק אחרי שכבר ענית ללקוח. המספר של הלקוח מזוהה אוטומטית — אין צורך להעביר אותו.',
+      parameters: {
+        type: 'object',
+        properties: {
+          reason: {
+            type: 'string',
+            enum: ['לא_ידעתי', 'ביקש_שיחזרו'],
+            description: 'למה בעל העסק צריך לדעת על זה',
+          },
+          summary: {
+            type: 'string',
+            description: 'משפט אחד: מה הלקוח רצה',
+          },
+        },
+        required: ['reason', 'summary'],
       },
     },
   },
@@ -167,7 +194,9 @@ const digits = (s) => String(s || '').replace(/\D/g, '');
  * value taken from the webhook makes that impossible.
  */
 export function buildExecutors(senderPhone) {
-  return {
+  // Side effects that must wait until the customer has been answered.
+  const pending = [];
+  const executors = {
     async get_shop_info() {
       return await getKnowledgeText();
     },
@@ -294,5 +323,24 @@ export function buildExecutors(senderPhone) {
         'יש לבקש מהלקוח מספר הזמנה, או להפנות אותו לבעל העסק.'
       );
     },
+
+    async notify_owner({ reason, summary }) {
+      const owner = config.business.ownerWhatsapp;
+      if (!owner) return 'OWNER_WHATSAPP לא מוגדר, ההודעה לבעל העסק לא נשלחה.';
+      const label = reason === 'ביקש_שיחזרו' ? 'לקוח ביקש שיחזרו אליו' : 'לא ידעתי לענות';
+      // Three lines and nothing more: the owner gets a nudge, not a transcript.
+      const text = `🔔 ${label}\nלקוח: ${digits(senderPhone)}\n${summary}`;
+      // Queued, not sent: the model can only call tools before it writes its
+      // final text, so sending here would reach the owner before the customer
+      // has an answer. The caller flushes the queue after the reply goes out.
+      pending.push(() => sendMessage(`${owner}@c.us`, text));
+      return 'ההודעה תישלח לבעל העסק מיד אחרי שהלקוח יקבל את התשובה שלך.';
+    },
   };
+  const afterReply = async () => {
+    for (const fn of pending.splice(0)) {
+      await fn().catch((err) => console.error(`[notify_owner] ${err.message}`));
+    }
+  };
+  return { executors, afterReply };
 }

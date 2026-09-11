@@ -8,5 +8,6 @@ if (!text) {
   console.error('שימוש: node scripts/ask.js "<שאלה>" [מספר-טלפון]');
   process.exit(1);
 }
-const { reply } = await answer({ text, senderPhone: phone });
+const { reply, afterReply } = await answer({ text, senderPhone: phone });
 console.log(`\n${reply}\n`);
+await afterReply();

@@ -59,6 +59,9 @@ export default Object.freeze({
     name: process.env.BUSINESS_NAME || 'העסק',
     ownerName: process.env.OWNER_NAME || 'בעל העסק',
     ownerPhone: process.env.OWNER_PHONE || '',
+    // Where notify_owner sends its alerts. Separate from OWNER_PHONE, which is
+    // the display number quoted to customers and not necessarily on WhatsApp.
+    ownerWhatsapp: (process.env.OWNER_WHATSAPP || '').replace(/\D/g, ''),
   },
   allowedSenders,
   memoryFile: process.env.MEMORY_FILE || './data/conversations.json',

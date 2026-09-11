@@ -44,7 +44,7 @@ async function handleMessage(body) {
     return;
   }
 
-  const { reply } = await answer({
+  const { reply, afterReply } = await answer({
     text: text.trim(),
     senderPhone,
     history: getHistory(chatId),
@@ -54,6 +54,8 @@ async function handleMessage(body) {
   await sendMessage(chatId, reply);
   remember(chatId, text.trim(), reply);
   console.log(`[out] ${senderPhone}: ${reply}`);
+  // Owner notifications go out only once the customer has their answer.
+  await afterReply();
 }
 
 const html = (res, code, body) => {
