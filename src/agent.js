@@ -98,11 +98,15 @@ function systemPrompt(customerName) {
 **כותב בשפה אחרת** — ענה באותה שפה.
 
 ## עדכון בעל העסק
-יש לך כלי בשם notify_owner ששולח לבעל העסק הודעה קצרה. קרא לו **רק** בשני מקרים:
-1. חיפשת בכלים הרלוונטיים (מאגר ידע, מלאי, הזמנות) ולא מצאת תשובה, והפנית את הלקוח לבעל העסק.
-2. הלקוח ביקש במפורש שיחזרו אליו, או השאיר פרטים ליצירת קשר (שם, טלפון אחר, שעות נוחות).
+יש לך כלי בשם notify_owner ששולח הודעת וואטסאפ לבעל העסק (${config.business.ownerName}).
+קרא לכלי זה **אך ורק בשני מקרים**:
+1. לא מצאת תשובה באף מקור (מאגר הידע, המלאי, ההזמנות) והפנית את הלקוח לבעל העסק.
+2. הלקוח ביקש במפורש שיחזרו אליו, או השאיר פרטים ליצירת קשר.
 
-קרא לכלי **באותו סבב שבו אתה עונה ללקוח**, לפני שאתה כותב את התשובה הסופית — ההודעה לבעל העסק נשלחת אוטומטית רק אחרי שהלקוח קיבל את התשובה שלך, אז הלקוח לא נשאר בלי מענה. אל תקרא לו על שאלות שענית עליהן, על הפניות שגרתיות (הנחה, ביטול הזמנה, שאלה רפואית), ולא יותר מפעם אחת לאותו עניין בשיחה. אל תספר ללקוח שהעברת הודעה — פשוט תגיד שבעל העסק יחזור אליו.
+כללים חשובים:
+- קרא לכלי פעם אחת בלבד לכל שיחה (לא בכל הודעה).
+- בתשובתך ללקוח: לעולם אל תאמר "שלחתי הודעה" או "עדכנתי את המערכת", אלא אמור: "אני מעביר את זה ל${config.business.ownerName} והוא יחזור אליך".
+
 
 ## מצב לא מוכר
 אם נתקלת במצב שלא כתוב כאן, אל תיתקע ואל תמציא נוהל. **תתנהג כמו מוכר טוב בחנות:** תגיד בפשטות מה אתה יודע ומה לא, תבדוק בכלים מה שאפשר לבדוק, תציע את הצעד הבא הכי הגיוני, ואם זה מעבר לסמכות שלך — תפנה לבעל העסק בשם ובטלפון. עדיף להודות שאתה לא בטוח מאשר לתת תשובה שנשמעת טוב ולא נכונה.
@@ -119,31 +123,45 @@ function systemPrompt(customerName) {
 - לקוח שקנה מוצר לגור ועבר מספיק זמן — שווה לבדוק אם החיה גדלה ולהציע את המוצר הבוגר המקביל.`;
 }
 
-async function callModel(messages) {
-  const res = await fetch(`${config.openrouter.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.openrouter.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.openrouter.model,
-      messages,
-      tools: toolSchemas,
-      tool_choice: 'auto',
-    }),
-  });
+async function callModel(messages, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const res = await fetch(`${config.openrouter.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.openrouter.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.openrouter.model,
+        messages,
+        tools: toolSchemas,
+        tool_choice: 'auto',
+      }),
+    });
 
-  if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      if ((res.status === 503 || res.status === 429) && attempt < retries) {
+        console.warn(`[llm] שגיאה זמנית ${res.status}, מנסה שוב בעוד 2 שניות (ניסיון ${attempt + 1})...`);
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      throw new Error(`LLM ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json();
+    if (data.error) {
+      if ((data.error.code === 503 || data.error.code === 429) && attempt < retries) {
+        console.warn(`[llm] שגיאה זמנית ${data.error.code}, מנסה שוב בעוד 2 שניות...`);
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      throw new Error(`LLM: ${JSON.stringify(data.error)}`);
+    }
+    return data.choices[0].message;
   }
-
-  const data = await res.json();
-  // OpenRouter surfaces upstream provider failures as a 200 with an `error`
-  // body, so a bare res.ok check is not enough.
-  if (data.error) throw new Error(`OpenRouter: ${JSON.stringify(data.error)}`);
-  return data.choices[0].message;
 }
+
 
 /**
  * One agent turn: model → tool calls → model → … until it answers in text.

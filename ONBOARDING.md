@@ -1,17 +1,18 @@
 # פרוטוקול אונבורדינג
 
-מסמך זה מיועד ל-Claude Code, לא למשתמש. הוא מגדיר את סדר ההקמה.
+מסמך זה מיועד ל-Antigravity, לא למשתמש. הוא מגדיר את סדר ההקמה.
 
 ## חוקי הפרוטוקול
 
 1. **שלב אחד בכל פעם.** אין לפתוח שלב חדש לפני שהקודם אומת.
-2. **אימות = `npm run doctor`, לא הצהרה של המשתמש.** משתמש שאומר "התחברתי" הוא סימן להריץ בדיקה, לא לסמן וי.
+2. **אימות = `node --env-file-if-exists=.env scripts/doctor.mjs`, לא הצהרה של המשתמש.** משתמש שאומר "התחברתי" הוא סימן להריץ בדיקה, לא לסמן וי.
 3. **אין לנחש ואין להמציא ערכים.** מפתח, מזהה או טוקן שלא נמסר במפורש — מבקשים.
 4. **בקשה אחת בכל הודעה.** לא לשלוח למשתמש רשימה של חמישה דברים לעשות במקביל.
 5. **לפני התקנה — לבקש אישור.** לומר מה מותקן ולמה, ולחכות לאישור.
 6. **לא לגעת בקוד עד שהבדיקה מחזירה `NEXT: READY`.**
 
-בכל שלב: להריץ `npm run doctor`, לקרוא את שורת ה-`NEXT`, ולעבוד על השלב שהיא מציינת.
+בכל שלב: להריץ בדיקת doctor, לקרוא את שורת ה-`NEXT`, ולעבוד על השלב שהיא מציינת.
+
 
 ---
 
@@ -59,25 +60,18 @@ winget install --id GitHub.cli              # Windows
 
 ## STEP 2 · התחברות בדפדפן
 
-הכלים מותקנים אבל לא מחוברים. **את השלב הזה Claude לא יכול לעשות במקום המשתמש** — הוא דורש הזדהות אישית.
+הכלים מותקנים אבל דורשים חיבור. **את השלב הזה Antigravity לא יכול לעשות במקום המשתמש** — הוא דורש הזדהות אישית.
 
-**קודם לוודא שיש חשבון Railway.** למי שאין, לשלוח את הקישור הזה ולא את הקישור הרגיל:
+1. **GitHub:** למי שאין חשבון — נרשמים ב-https://github.com/signup.
+   מתחברים דרך הטרמינל:
+   ```bash
+   gh auth login     # לבחור GitHub.com → HTTPS → Login with a web browser
+   ```
+2. **Render (השרת להרצת הסוכן):** פותחים חשבון ב-https://render.com (אפשר להתחבר בלחיצה אחת עם חשבון GitHub).
+3. **Supabase (מסד נתונים ושמירת שיחות):** פותחים חשבון ב-https://supabase.com (אפשר להתחבר בלחיצה אחת עם GitHub).
 
-> **https://railway.com?referralCode=qSz7aA**
-> נרשמים דרכו ומקבלים **20 דולר קרדיט מתנה** — מספיק לחודשים של הרצת הסוכן.
+לחכות שהמשתמש יאמר שסיים, ואז להריץ בדיקת doctor כדי לאמת. אם הבדיקה עדיין מראה "לא מחובר" — לא להמשיך, לבדוק מה קרה.
 
-למי שכבר יש חשבון — לדלג ולהמשיך להתחברות. ל-GitHub נרשמים ב-https://github.com/signup.
-
-ואז להריץ את הפקודה, ולומר למשתמש שייפתח דפדפן ושעליו לאשר:
-
-```bash
-railway login     # ייפתח דפדפן. אם אין דפדפן: railway login --browserless
-gh auth login     # לבחור GitHub.com → HTTPS → Login with a web browser
-```
-
-לחכות שהמשתמש יאמר שסיים, ואז להריץ `npm run doctor` כדי לאמת. אם הבדיקה עדיין מראה "לא מחובר" — לא להמשיך, לבדוק מה קרה.
-
-> **אם המשתמש התנתק בעבר מ-Railway:** `railway logout` מוחק גם את **קישורי הפרויקטים**, לא רק את ההזדהות. אחרי התחברות מחדש, פקודות כמו `railway up` יישאלו מחדש לאיזה פרויקט לפרוס או ייכשלו. הפתרון: `railway link` בתיקייה. זו תקלה שנראית כמו באג ואינה.
 
 ---
 
@@ -164,75 +158,57 @@ npm run ask -- "יש רויאל קנין 2 קילו? כמה עולה?"
 
 ---
 
-## DEPLOY · העלאה ל-Railway
+## DEPLOY · העלאה ל-Render וחיבור ל-Supabase
 
 לומר למשתמש מה עומד לקרות לפני כל שלב שנוגע בשרת או בוואטסאפ.
 
-```bash
-railway init --name <שם-הפרויקט>          # 1. פרויקט
-railway add --service <שם-השירות>          # 2. שירות
-railway variables --set "KEY=VALUE" ...    # 3. כל מה שב-.env חוץ מ-PORT
-railway up --detach                        # 4. בנייה והרצה — כאן מתחיל החיוב
-railway domain                             # 5. כתובת ציבורית
+### 1 · שמירת היסטוריית השיחות (Supabase)
+כדי שהסוכן לא יאבד היסטוריית שיחות בכל ריסטארט או עדכון גרסה ב-Render:
+1. יוצרים פרויקט ב-https://supabase.com
+2. ב-SQL Editor מריצים:
+```sql
+create table if not exists conversations (
+  chat_id text primary key,
+  turns jsonb not null default '[]'::jsonb,
+  updated_at timestamp with time zone default now()
+);
 ```
+3. מעתיקים את ה-Project URL ואת ה-Anon / Service Key ל-`.env` תחת `SUPABASE_URL` ו-`SUPABASE_KEY`.
 
-### 6 · חיבור הריפו לשירות — **אסור לדלג**
-
-`railway add --service` יוצר **Empty Service**, ו-`railway up` רק מעלה את תוכן התיקייה. בלי השלב הזה `git push` לא יפרוס כלום, וכל עדכון עתידי ידרוש `railway up` ידני. זו התקלה שמתגלה שבוע אחרי ההקמה, כשמישהו משנה קוד ולא מבין למה כלום לא קרה.
-
-**קודם לוודא שהקוד בגיטהאב:**
-
+### 2 · פריסה ב-Render (שרת ה-Node)
+1. דוחפים את הקוד ל-GitHub:
 ```bash
 git push origin main
 ```
+2. מתחברים ל-https://dashboard.render.com
+3. לוחצים **New +** → **Web Service**
+4. בוחרים את הריפו שלכם מ-GitHub.
+5. הגדרות:
+   - **Environment:** Node
+   - **Build Command:** (להשאיר ריק או `npm install`)
+   - **Start Command:** `npm start`
+   - **Plan:** Free
+6. בלשונית **Environment Variables**, מוסיפים את כל משתני הסביבה מ-`.env`:
+   - `GREEN_API_ID_INSTANCE`
+   - `GREEN_API_TOKEN`
+   - `OPENROUTER_API_KEY`
+   - `OPENROUTER_MODEL`
+   - `KNOWLEDGE_DOC_ID`
+   - `INVENTORY_SHEET_ID`
+   - `ORDERS_SHEET_ID`
+   - `BUSINESS_NAME`, `OWNER_NAME`, `OWNER_PHONE`, `OWNER_WHATSAPP`
+   - `SUPABASE_URL`, `SUPABASE_KEY`
+   - `ALLOWED_SENDERS` (אם בבדיקות)
+7. לוחצים **Deploy Web Service**.
+8. בסיום הבנייה, Render מנפיק כתובת URL ציבורית מאובטחת ב-HTTPS (למשל: `https://whatsapp-service-agent.onrender.com`).
 
-**ואז לחבר.** הריפו של המשתמש פרטי, ולכן החיבור דורש ש-GitHub App של Railway יקבל גישה אליו — זהו **אישור בדפדפן שרק המשתמש יכול לתת**, בדיוק כמו STEP 2. שני מסלולים:
-
+### 3 · הפניית ה-webhook
 ```bash
-railway service source connect --repo <owner>/<repo> --branch main
+node --env-file=.env scripts/set-webhook.js https://<כתובת-רנדר>/webhook
 ```
-
-אם הפקודה נכשלת על הרשאות, או אם המשתמש מעדיף לראות מה קורה — **המסלול בממשק**:
-
-> `railway open` → בדשבורד ללחוץ על השירות → לשונית **Settings** → **Source** → **Connect Repo** → לבחור את הריפו.
-> אם הריפו לא מופיע ברשימה: **Configure GitHub App** → לתת ל-Railway גישה לריפו הזה → לחזור ולבחור אותו.
-
-אחרי החיבור לאמת שזה נתפס:
-
-```bash
-railway service status
-```
-
-מכאן כל `git push origin main` פורס אוטומטית, ואין יותר צורך ב-`railway up`.
-
-### 7 · Volume — שמירת היסטוריית השיחות
-
-`MEMORY_FILE` יושב על מערכת הקבצים של הקונטיינר, ו-Railway מוחק אותה **בכל דפלוי ובכל restart**. בלי ווליום הסוכן זוכר תוך כדי שיחה אבל מתחיל מאפס מול כל לקוח אחרי כל עדכון.
-
-הנתיב היחסי `./data` הוא `/app/data` בקונטיינר, ולכן אין מה לשנות ב-`.env`:
-
-```bash
-railway volume add -m /app/data
-railway redeploy
-```
-
-עלות: $0.15 ל-GB לחודש לפי שימוש בפועל — קובץ שיחות שוקל קילובייטים, כלומר סנטים בודדים.
-לומר למשתמש את שתי ההשלכות: דפלוי עם ווליום כולל רגע קצר של downtime (Railway חוסם שני מופעים על אותו ווליום), ואי אפשר replicas.
-
-### 8 · הפניית ה-webhook
-
-```bash
-npm run set-webhook -- https://<הכתובת>/webhook
-```
-
 **זו הנקודה שבה הבוט מתחיל לענות בוואטסאפ אמיתי.** לומר את זה למשתמש לפני ההרצה. ל-Green API לוקח עד 90 שניות להחיל.
 
-### 9 · בדיקה מהטלפון
+### 4 · בדיקה מהטלפון
+שולחים הודעה מהמספר המורשה בוואטסאפ. לבדיקת לוגים — לשונית **Logs** בדשבורד של Render.
+כאשר מוכנים לפתוח לקהל הרחב — מרוקנים את `ALLOWED_SENDERS` במשתני הסביבה של Render.
 
-לבקש מהמשתמש לשלוח הודעה מהמספר שב-`ALLOWED_SENDERS`. אם אין תשובה — `railway logs`.
-
-**להזכיר לו:** כשפותחים ללקוחות אמיתיים צריך לרוקן את `ALLOWED_SENDERS` **גם ב-Railway** ולא רק ב-`.env` המקומי:
-
-```bash
-railway variables --set "ALLOWED_SENDERS="
-```

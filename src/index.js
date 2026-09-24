@@ -39,20 +39,21 @@ async function handleMessage(body) {
   console.log(`[in ] ${senderPhone}: ${text}`);
 
   if (text.trim() === '/reset') {
-    forget(chatId);
+    await forget(chatId);
     await sendMessage(chatId, 'השיחה אופסה.');
     return;
   }
 
+  const history = await getHistory(chatId);
   const { reply, afterReply } = await answer({
     text: text.trim(),
     senderPhone,
-    history: getHistory(chatId),
+    history,
   });
 
   if (!reply) return;
   await sendMessage(chatId, reply);
-  remember(chatId, text.trim(), reply);
+  await remember(chatId, text.trim(), reply);
   console.log(`[out] ${senderPhone}: ${reply}`);
   // Owner notifications go out only once the customer has their answer.
   await afterReply();

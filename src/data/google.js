@@ -1,4 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import config from '../config.js';
+
+function readLocalIfExists(filename) {
+  const p = path.resolve(process.cwd(), 'data', filename);
+  if (fs.existsSync(p)) {
+    return fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
+  }
+  return null;
+}
 
 // Google's /export endpoints serve link-shared files with no credentials at all.
 // The official APIs (docs.googleapis.com, sheets.googleapis.com) return 401 even
@@ -29,8 +39,14 @@ async function fetchCached(url) {
 }
 
 export function getKnowledgeText() {
+  const local = readLocalIfExists('knowledge.txt') || readLocalIfExists('knowledge.md');
+  if (local !== null) return Promise.resolve(local);
+  if (!config.data.knowledgeDocId) {
+    return Promise.reject(new Error('לא נמצא data/knowledge.txt ואין KNOWLEDGE_DOC_ID'));
+  }
   return fetchCached(DOC_EXPORT(config.data.knowledgeDocId));
 }
+
 
 /**
  * Minimal RFC-4180 CSV parser.
@@ -86,5 +102,16 @@ export function parseCsv(text) {
 }
 
 export async function getSheetRows(sheetId) {
+  if (sheetId === config.data.ordersSheetId || sheetId === 'orders' || sheetId === 'local:orders') {
+    const local = readLocalIfExists('orders.csv');
+    if (local !== null) return parseCsv(local);
+  }
+  if (sheetId === config.data.inventorySheetId || sheetId === 'inventory' || sheetId === 'local:inventory') {
+    const local = readLocalIfExists('inventory.csv');
+    if (local !== null) return parseCsv(local);
+  }
+  if (!sheetId) return [];
   return parseCsv(await fetchCached(SHEET_EXPORT(sheetId)));
 }
+
+

@@ -19,33 +19,95 @@ function load() {
   }
 }
 
-function persist() {
+function persistLocal() {
   try {
     fs.mkdirSync(path.dirname(config.memoryFile), { recursive: true });
     fs.writeFileSync(config.memoryFile, JSON.stringify(store));
   } catch (err) {
     // Never let a disk problem take down an answer that already succeeded.
-    console.error('[memory] כתיבה נכשלה:', err.message);
+    console.error('[memory] כתיבה מקומית נכשלה:', err.message);
   }
 }
 
 load();
 
-export function getHistory(chatId) {
+export async function getHistory(chatId) {
+  if (store[chatId]) return store[chatId];
+  if (config.supabase?.url && config.supabase?.key) {
+    try {
+      const url = `${config.supabase.url.replace(/\/$/, '')}/rest/v1/conversations?chat_id=eq.${encodeURIComponent(chatId)}&select=turns`;
+      const res = await fetch(url, {
+        headers: {
+          apikey: config.supabase.key,
+          Authorization: `Bearer ${config.supabase.key}`,
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows?.[0]?.turns) {
+          store[chatId] = rows[0].turns;
+          return store[chatId];
+        }
+      }
+    } catch (err) {
+      console.error('[memory] שגיאה במשיכת היסטוריה מסופהבייס:', err.message);
+    }
+  }
   return store[chatId] || [];
 }
 
-export function remember(chatId, userText, assistantText) {
+export async function remember(chatId, userText, assistantText) {
   const turns = [
     ...(store[chatId] || []),
     { role: 'user', content: userText },
     { role: 'assistant', content: assistantText },
   ];
   store[chatId] = turns.slice(-MAX_TURNS);
-  persist();
+  persistLocal();
+
+  if (config.supabase?.url && config.supabase?.key) {
+    try {
+      const url = `${config.supabase.url.replace(/\/$/, '')}/rest/v1/conversations`;
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          apikey: config.supabase.key,
+          Authorization: `Bearer ${config.supabase.key}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          turns: store[chatId],
+          updated_at: new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (err) {
+      console.error('[memory] שגיאה בשמירה בסופהבייס:', err.message);
+    }
+  }
 }
 
-export function forget(chatId) {
+export async function forget(chatId) {
   delete store[chatId];
-  persist();
+  persistLocal();
+
+  if (config.supabase?.url && config.supabase?.key) {
+    try {
+      const url = `${config.supabase.url.replace(/\/$/, '')}/rest/v1/conversations?chat_id=eq.${encodeURIComponent(chatId)}`;
+      await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          apikey: config.supabase.key,
+          Authorization: `Bearer ${config.supabase.key}`,
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (err) {
+      console.error('[memory] שגיאה במחיקה מסופהבייס:', err.message);
+    }
+  }
 }
+

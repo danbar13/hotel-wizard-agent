@@ -1,8 +1,8 @@
 /**
  * בדיקת מוכנות — מה כבר מחובר ומה חסר.
- * שימוש:  npm run doctor
+ * שימוש:  node --env-file-if-exists=.env scripts/doctor.mjs
  *
- * מיועד להיקרא גם על ידי Claude Code בתחילת האונבורדינג. הפלט מסתיים
+ * מיועד להיקרא גם על ידי Antigravity בתחילת האונבורדינג. הפלט מסתיים
  * בשורת NEXT שאומרת באיזה שלב ב-ONBOARDING.md להתחיל, כדי שההחלטה
  * תתבסס על בדיקה בפועל ולא על ניחוש.
  */
@@ -21,16 +21,24 @@ function sh(cmd) {
   }
 }
 
+function hasBin(bin) {
+  const cmd = process.platform === 'win32' ? `where.exe ${bin}` : `command -v ${bin}`;
+  return sh(cmd).ok;
+}
+
+
 /** .env is read by hand so the doctor runs even when the file is malformed. */
 function readEnv() {
   if (!fs.existsSync('.env')) return null;
   const env = {};
-  for (const line of fs.readFileSync('.env', 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+  for (const rawLine of fs.readFileSync('.env', 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/);
     if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
   }
   return env;
 }
+
 
 const missing = [];
 const TEMPLATE_REPO = 'roeit10/whatsapp-business-agent';
@@ -62,25 +70,27 @@ else {
 
 // ---------- 2. כלי שורת פקודה ----------
 console.log('\n\x1b[1m2. כלי שורת פקודה\x1b[0m');
-for (const [name, bin, authCmd, authHint] of [
-  ['Railway', 'railway', 'railway whoami', 'railway login'],
-  ['GitHub', 'gh', 'gh auth status', 'gh auth login'],
-]) {
-  const installed = sh(`command -v ${bin}`).ok;
-  if (!installed) {
-    console.log(no(`${name} CLI לא מותקן`));
-    missing.push(`${bin}-install`);
-    continue;
-  }
-  const auth = sh(authCmd);
+const ghInstalled = hasBin('gh');
+if (!ghInstalled) {
+  console.log(no('GitHub CLI (gh) לא מותקן'));
+  missing.push('gh-install');
+} else {
+  const auth = sh('gh auth status');
   if (auth.ok) {
     const who = auth.out.split('\n').find((l) => l.trim()) || '';
-    console.log(ok(`${name} CLI — ${who.replace(/\s+/g, ' ').slice(0, 60)}`));
+    console.log(ok(`GitHub CLI — ${who.replace(/\s+/g, ' ').slice(0, 60)}`));
   } else {
-    console.log(no(`${name} CLI מותקן אבל לא מחובר — צריך: ${authHint}`));
-    missing.push(`${bin}-login`);
+    console.log(no('GitHub CLI מותקן אבל לא מחובר — צריך: gh auth login'));
+    missing.push('gh-login');
   }
 }
+
+if (fs.existsSync('render.yaml')) {
+  console.log(ok('הגדרת פריסה ל-Render מוכנה (render.yaml)'));
+} else {
+  console.log(warn('קובץ render.yaml לא קיים לפריסה ברנדר'));
+}
+
 
 // ---------- 3. קובץ ההגדרות ----------
 console.log('\n\x1b[1m3. קובץ ההגדרות (.env)\x1b[0m');
@@ -89,22 +99,51 @@ if (!env) {
   console.log(no('.env לא קיים — יש להעתיק מ-.env.example'));
   missing.push('env-file');
 } else {
-  const required = {
+  const localFiles = {
+    KNOWLEDGE_DOC_ID: { label: 'מסמך הידע', local: fs.existsSync('data/knowledge.txt') || fs.existsSync('data/knowledge.md'), file: 'data/knowledge.txt' },
+    INVENTORY_SHEET_ID: { label: 'גיליון המלאי', local: fs.existsSync('data/inventory.csv'), file: 'data/inventory.csv' },
+    ORDERS_SHEET_ID: { label: 'גיליון ההזמנות', local: fs.existsSync('data/orders.csv'), file: 'data/orders.csv' },
+  };
+
+  for (const [key, label] of Object.entries({
     GREEN_API_ID_INSTANCE: 'Green API',
     GREEN_API_TOKEN: 'Green API',
-    OPENROUTER_API_KEY: 'OpenRouter',
-    KNOWLEDGE_DOC_ID: 'מסמך הידע',
-    INVENTORY_SHEET_ID: 'גיליון המלאי',
-    ORDERS_SHEET_ID: 'גיליון ההזמנות',
-  };
-  for (const [key, label] of Object.entries(required)) {
+  })) {
     if (env[key]) console.log(ok(`${key} (${label})`));
     else {
       console.log(no(`${key} חסר (${label})`));
       missing.push(key);
     }
   }
+
+  if (env.GEMINI_API_KEY) {
+    console.log(ok('GEMINI_API_KEY (Google Gemini API — חינם)'));
+  } else if (env.OPENROUTER_API_KEY) {
+    console.log(ok('OPENROUTER_API_KEY (OpenRouter)'));
+  } else {
+    console.log(no('GEMINI_API_KEY חסר (או OPENROUTER_API_KEY)'));
+    missing.push('GEMINI_API_KEY');
+  }
+
+  for (const [key, info] of Object.entries(localFiles)) {
+    if (info.local) {
+      console.log(ok(`${key} (${info.label} — מקומי ב-${info.file})`));
+    } else if (env[key]) {
+      console.log(ok(`${key} (${info.label} — Google ID)`));
+    } else {
+      console.log(no(`${key} חסר (${info.label} — נדרש ID ב-.env או קובץ מקומי ב-${info.file})`));
+      missing.push(key);
+    }
+  }
+
+  if (env.OWNER_WHATSAPP) {
+    console.log(ok(`OWNER_WHATSAPP (${env.OWNER_WHATSAPP}) — התראות מנהל פעילות`));
+  } else {
+    console.log(warn('OWNER_WHATSAPP לא מוגדר — הסוכן יפעל ללא שליחת התראות לבעל העסק'));
+  }
 }
+
+
 
 // ---------- 4. בדיקות חיות ----------
 console.log('\n\x1b[1m4. בדיקה מול השירותים\x1b[0m');
@@ -134,7 +173,23 @@ if (env?.GREEN_API_ID_INSTANCE && env?.GREEN_API_TOKEN) {
   }
 } else console.log('⏭️  Green API — מדלג, אין מפתחות');
 
-if (env?.OPENROUTER_API_KEY) {
+if (env?.GEMINI_API_KEY) {
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', {
+      headers: { Authorization: `Bearer ${env.GEMINI_API_KEY}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.ok) {
+      console.log(ok('Google Gemini — המפתח תקין ומחובר בחינם!'));
+    } else {
+      console.log(no(`Google Gemini — המפתח נדחה (${r.status})`));
+      missing.push('gemini-key');
+    }
+  } catch {
+    console.log(no('Google Gemini — לא הצלחתי להגיע לשירות'));
+    missing.push('gemini-reach');
+  }
+} else if (env?.OPENROUTER_API_KEY) {
   try {
     const r = await fetch('https://openrouter.ai/api/v1/key', {
       headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}` },
@@ -152,16 +207,21 @@ if (env?.OPENROUTER_API_KEY) {
     console.log(no('OpenRouter — לא הצלחתי להגיע לשירות'));
     missing.push('openrouter-reach');
   }
-} else console.log('⏭️  OpenRouter — מדלג, אין מפתח');
+} else console.log('⏭️  מוח ה-AI (Gemini / OpenRouter) — מדלג, אין מפתח');
+
 
 const googleFiles = [
-  ['KNOWLEDGE_DOC_ID', 'מסמך הידע', (id) => `https://docs.google.com/document/d/${id}/export?format=txt`],
-  ['INVENTORY_SHEET_ID', 'גיליון המלאי', (id) => `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`],
-  ['ORDERS_SHEET_ID', 'גיליון ההזמנות', (id) => `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`],
+  ['KNOWLEDGE_DOC_ID', 'מסמך הידע', (id) => `https://docs.google.com/document/d/${id}/export?format=txt`, 'data/knowledge.txt'],
+  ['INVENTORY_SHEET_ID', 'גיליון המלאי', (id) => `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`, 'data/inventory.csv'],
+  ['ORDERS_SHEET_ID', 'גיליון ההזמנות', (id) => `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`, 'data/orders.csv'],
 ];
-for (const [key, label, url] of googleFiles) {
+for (const [key, label, url, localPath] of googleFiles) {
+  if (fs.existsSync(localPath) || (localPath.endsWith('.txt') && fs.existsSync('data/knowledge.md'))) {
+    console.log(ok(`${label} — קובץ מקומי תקין (${localPath})`));
+    continue;
+  }
   if (!env?.[key]) {
-    console.log(`⏭️  ${label} — מדלג, אין מזהה`);
+    console.log(`⏭️  ${label} — מדלג, אין מזהה או קובץ מקומי`);
     continue;
   }
   try {
@@ -179,6 +239,27 @@ for (const [key, label, url] of googleFiles) {
     missing.push(`${key}-reach`);
   }
 }
+
+
+if (env?.SUPABASE_URL && (env?.SUPABASE_KEY || env?.SUPABASE_ANON_KEY)) {
+  const key = env.SUPABASE_KEY || env.SUPABASE_ANON_KEY;
+  try {
+    const r = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.ok || r.status === 404 || r.status === 200) {
+      console.log(ok('Supabase — מחובר ותקין לשמירת שיחות'));
+    } else {
+      console.log(warn(`Supabase — השיב בסטטוס ${r.status}, נא לוודא מפתח וכתובת URL`));
+    }
+  } catch {
+    console.log(warn('Supabase — לא הצלחתי להגיע לשירות'));
+  }
+} else {
+  console.log('ℹ️  Supabase — לא הוגדר (הסוכן ישמור היסטוריה בקובץ מקומי data/conversations.json)');
+}
+
 
 // ---------- סיכום ----------
 console.log('\n' + '─'.repeat(58));

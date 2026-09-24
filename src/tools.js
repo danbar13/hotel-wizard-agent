@@ -80,12 +80,17 @@ export const toolSchemas = [
             type: 'string',
             description: 'משפט אחד: מה הלקוח רצה',
           },
+          customer_phone: {
+            type: 'string',
+            description: 'מספר הטלפון של הלקוח (אופציונלי)',
+          },
         },
         required: ['reason', 'summary'],
       },
     },
   },
-];
+].filter((t) => t.function.name !== 'notify_owner' || Boolean(config.business.ownerWhatsapp));
+
 
 /**
  * Customers and spreadsheets never spell units the same way: "2 קילו" vs "2 קג",
@@ -193,7 +198,16 @@ const digits = (s) => String(s || '').replace(/\D/g, '');
  * someone else's order ("check the order for 05X-XXXXXXX") — closing over the
  * value taken from the webhook makes that impossible.
  */
+const notifiedContacts = new Set();
+
+export function resetNotified(phone) {
+  if (phone) notifiedContacts.delete(digits(phone));
+  else notifiedContacts.clear();
+}
+
 export function buildExecutors(senderPhone) {
+
+
   // Side effects that must wait until the customer has been answered.
   const pending = [];
   const executors = {
@@ -324,18 +338,23 @@ export function buildExecutors(senderPhone) {
       );
     },
 
-    async notify_owner({ reason, summary }) {
+    async notify_owner({ reason, summary, customer_phone }) {
       const owner = config.business.ownerWhatsapp;
       if (!owner) return 'OWNER_WHATSAPP לא מוגדר, ההודעה לבעל העסק לא נשלחה.';
-      const label = reason === 'ביקש_שיחזרו' ? 'לקוח ביקש שיחזרו אליו' : 'לא ידעתי לענות';
-      // Three lines and nothing more: the owner gets a nudge, not a transcript.
-      const text = `🔔 ${label}\nלקוח: ${digits(senderPhone)}\n${summary}`;
-      // Queued, not sent: the model can only call tools before it writes its
-      // final text, so sending here would reach the owner before the customer
-      // has an answer. The caller flushes the queue after the reply goes out.
+
+      const clientPhone = digits(customer_phone || senderPhone);
+      if (notifiedContacts.has(clientPhone)) {
+        return 'כבר נשלחה הודעה לבעל העסק עבור לקוח זה בשיחה זו. אין לשלוח שוב.';
+      }
+      notifiedContacts.add(clientPhone);
+
+      const label = reason === 'ביקש_שיחזרו' ? 'לקוח ביקש שיחזרו אליו' : 'לא נמצאה תשובה במקורות המידע והלקוח הופנה אליך';
+      const text = `סיבה: ${label}\nלקוח: ${clientPhone}\nמה הלקוח רצה: ${summary}`;
+
       pending.push(() => sendMessage(`${owner}@c.us`, text));
       return 'ההודעה תישלח לבעל העסק מיד אחרי שהלקוח יקבל את התשובה שלך.';
     },
+
   };
   const afterReply = async () => {
     for (const fn of pending.splice(0)) {
