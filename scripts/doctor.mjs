@@ -244,12 +244,14 @@ for (const [key, label, url, localPath] of googleFiles) {
 if (env?.SUPABASE_URL && (env?.SUPABASE_KEY || env?.SUPABASE_ANON_KEY)) {
   const key = env.SUPABASE_KEY || env.SUPABASE_ANON_KEY;
   try {
-    const r = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/`, {
+    const r = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/conversations?select=*`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       signal: AbortSignal.timeout(15000),
     });
-    if (r.ok || r.status === 404 || r.status === 200) {
-      console.log(ok('Supabase — מחובר ותקין לשמירת שיחות'));
+    if (r.ok) {
+      console.log(ok('Supabase — מחובר וטבלת השיחות (conversations) קיימת ופעילה'));
+    } else if (r.status === 404) {
+      console.log(warn('Supabase — מחובר ומאומת! (נדרש להריץ את ה-SQL ליצירת טבלת conversations)'));
     } else {
       console.log(warn(`Supabase — השיב בסטטוס ${r.status}, נא לוודא מפתח וכתובת URL`));
     }
@@ -259,6 +261,7 @@ if (env?.SUPABASE_URL && (env?.SUPABASE_KEY || env?.SUPABASE_ANON_KEY)) {
 } else {
   console.log('ℹ️  Supabase — לא הוגדר (הסוכן ישמור היסטוריה בקובץ מקומי data/conversations.json)');
 }
+
 
 
 // ---------- סיכום ----------
