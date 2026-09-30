@@ -70,14 +70,14 @@ export default Object.freeze({
     process.env.RENDER_EXTERNAL_URL ||
     (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : ''),
   // Number customers reach on WhatsApp, for the site's call-to-action links.
-  shopWhatsapp: (process.env.SHOP_WHATSAPP || process.env.OWNER_WHATSAPP || '972525340230').replace(/\D/g, ''),
+  shopWhatsapp: (process.env.SHOP_WHATSAPP || '972774204022').replace(/\D/g, ''),
   business: {
     name: process.env.BUSINESS_NAME || 'העסק',
     ownerName: process.env.OWNER_NAME || 'בעל העסק',
     ownerPhone: process.env.OWNER_PHONE || '',
     // Where notify_owner sends its alerts. Separate from OWNER_PHONE, which is
     // the display number quoted to customers and not necessarily on WhatsApp.
-    ownerWhatsapp: (process.env.OWNER_WHATSAPP || '').replace(/\D/g, ''),
+    ownerWhatsapp: (process.env.OWNER_WHATSAPP || '972525340230').replace(/\D/g, ''),
   },
   supabase: {
     url: process.env.SUPABASE_URL || '',

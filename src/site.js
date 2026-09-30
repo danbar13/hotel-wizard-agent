@@ -41,7 +41,7 @@ function getItemImage(row) {
 }
 
 function getWhatsAppUrl(text = '') {
-  const phone = config.shopWhatsapp || '972525340230';
+  const phone = config.shopWhatsapp || '972774204022';
   const defaultMsg = 'שלום! אשמח לפרטים ולהזמנת חופשה במלון וויזארד ריזורט & ספא';
   const msg = encodeURIComponent(text || defaultMsg);
   return `https://api.whatsapp.com/send?phone=${phone}&text=${msg}`;
