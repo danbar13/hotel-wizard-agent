@@ -172,8 +172,12 @@ create table if not exists conversations (
   turns jsonb not null default '[]'::jsonb,
   updated_at timestamp with time zone default now()
 );
+
+-- הפעלת Row Level Security (RLS) כדי לחסום גישה ציבורית לא מורשית לשיחות
+alter table conversations enable row level security;
 ```
-3. מעתיקים את ה-Project URL ואת ה-Anon / Service Key ל-`.env` תחת `SUPABASE_URL` ו-`SUPABASE_KEY`.
+3. מעתיקים את ה-Project URL ואת מפתח ה-**service_role / Secret Key** (לא המפתח הציבורי anon/publishable) ל-`.env` תחת `SUPABASE_URL` ו-`SUPABASE_KEY`. מפתח זה נדרש כי השרת פועל כ-Backend מורשה העוקף RLS באופן מאובטח.
+
 
 ### 2 · פריסה ב-Render (שרת ה-Node)
 1. דוחפים את הקוד ל-GitHub:
