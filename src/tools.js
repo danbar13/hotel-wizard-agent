@@ -13,8 +13,9 @@ export const toolSchemas = [
     function: {
       name: 'get_shop_info',
       description:
-        'מחזיר את מאגר הידע של העסק: שעות פתיחה, מדיניות משלוחים, מדיניות החזרות, מחירי פנסיון, אמצעי תשלום. ' +
-        'יש לקרוא לכלי הזה לכל שאלה על נהלים, שעות, מחירי שירות או מדיניות. אין לענות על שאלות כאלה מהזיכרון.',
+        'מחזיר את מאגר הידע של מלון וויזארד ריזורט & ספא: שעות קבלה וצ\'ק-אין/צ\'ק-אאוט, שירותי המלון, ' +
+        'טיולים מודרכים לירח, מסעדות המלון, מתחם הספא והבריכות, חניה ושאטלים, ומדיניות ביטולים. ' +
+        'יש לקרוא לכלי הזה לכל שאלה על נהלים, שעות, שירותים או מדיניות. אין לענות על שאלות כאלה מהזיכרון.',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -23,14 +24,15 @@ export const toolSchemas = [
     function: {
       name: 'check_inventory',
       description:
-        'בודק זמינות ומחיר של מוצר במלאי החנות. יש לקרוא לכלי הזה לכל שאלה בנוסח "יש לכם X", "כמה עולה X", ' +
-        '"יש במלאי X". חיפוש חופשי לפי שם מוצר או קטגוריה. אין להמציא מחירים או כמויות.',
+        'בודק זמינות, מאפיינים ומחיר של חדרים, סוויטות, טיולים לירח, טיפולי ספא וחוויות במלון וויזארד. ' +
+        'יש לקרוא לכלי הזה לכל שאלה בנוסח "כמה עולה חדר", "איזה סוויטות יש", "כמה עולה טיול לירח", "יש מקום פנוי". ' +
+        'חיפוש חופשי לפי שם חדר, חוויה או קטגוריה (לדוגמה "נובה אורביטלי", "טיול לירח", "סוויטת אפס כבידה", "ספא").',
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
-            description: 'שם המוצר או הקטגוריה לחיפוש, לדוגמה "רויאל קנין" או "חול לחתולים"',
+            description: 'שם החדר, הסוויטה, הטיול או השירות המבוקש במלון',
           },
         },
         required: ['query'],
@@ -253,29 +255,16 @@ export function buildExecutors(senderPhone) {
       const matches = tied.slice(0, 12).map((x) => publicProduct(x.row));
 
       if (!matches.length) {
-        // Nothing matched even loosely. Rather than declaring "we don't carry
-        // it" on the strength of a string comparison, hand the whole catalogue
-        // to the model — it understands that "אוכל לתוכי" and "מזון לציפורים"
-        // are the same thing, and that a mangled brand name is still that brand.
         return (
-          `לא נמצאה התאמה טקסטואלית ל"${query}". להלן קטלוג המלאי המלא.\n` +
-          'לקוחות מקלידים שמות מותגים בשגיאה כל הזמן, ובעברית זה קורה יותר. ' +
-          'עבור על הקטלוג ושאל את עצמך למה הלקוח סביר שהתכוון — לא רק מה זהה לו.\n' +
-          '- אם סביר שזו שגיאת כתיב או ניסוח אחר של מוצר מהרשימה, ענה לפיו.\n' +
-          '- אם אתה מהסס בין אפשרות אחת או שתיים, אל תגיד שאין. שאל את הלקוח ' +
-          'אם לזה הוא התכוון, בדיוק כמו מוכר בחנות.\n' +
-          '- רק אם באמת אין בקטלוג שום דבר קרוב, אמור שהמוצר לא מופיע אצלנו.\n' +
+          `לא נמצאה התאמה ישירה ל"${query}". להלן רשימת החדרים, הסוויטות והאטרקציות המלאה במלון:\n` +
+          'עבור על הרשימה ובדוק למה האורח התכוון (לדוגמה חדרים פנורמיים, סוויטות כבידה אפסית, טיולים לירח וכדומה):\n' +
           JSON.stringify(rows.map(publicProduct), null, 1)
         );
       }
-      // Tell the model how wide the result set is. With a 150-product catalogue a
-      // broad request like "food for my dog" matches dozens of rows, and dumping
-      // them all at the customer is worse than asking one narrowing question.
       const head =
         tied.length > 4
-          ? `נמצאו ${tied.length} מוצרים שמתאימים לבקשה (מוצגים ${matches.length}). ` +
-            'זה רחב מדי בשביל תשובה אחת — שאל את הלקוח שאלת סינון אחת (גזע, גיל, גודל אריזה) ' +
-            'ורק אז המלץ.\n'
+          ? `נמצאו ${tied.length} אפשרויות המתאימות לבקשה (מוצגות ${matches.length}). ` +
+            'ניתן לברר עם האורח פרטים נוספים (כמות אורחים, תאריכים מבוקשים) ולהמליץ על האפשרות המובילה.\n'
           : '';
 
       // If everything that matched is out of stock, never hand back a dead end.

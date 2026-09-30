@@ -70,7 +70,7 @@ export default Object.freeze({
     process.env.RENDER_EXTERNAL_URL ||
     (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : ''),
   // Number customers reach on WhatsApp, for the site's call-to-action links.
-  shopWhatsapp: (process.env.SHOP_WHATSAPP || '').replace(/\D/g, ''),
+  shopWhatsapp: (process.env.SHOP_WHATSAPP || process.env.OWNER_WHATSAPP || '972525340230').replace(/\D/g, ''),
   business: {
     name: process.env.BUSINESS_NAME || 'העסק',
     ownerName: process.env.OWNER_NAME || 'בעל העסק',

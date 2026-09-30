@@ -1,4 +1,6 @@
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import config from './config.js';
 import { answer } from './agent.js';
 import { getHistory, remember, forget } from './memory.js';
@@ -65,6 +67,21 @@ const html = (res, code, body) => {
 };
 
 const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url.startsWith('/images/')) {
+    const safeName = path.basename(req.url.split('?')[0]);
+    const filePath = path.join(process.cwd(), 'public', 'images', safeName);
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Cache-Control': 'public, max-age=86400',
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+  }
+
   if (req.method === 'GET' && req.url === '/') {
     homePage()
       .then((body) => html(res, 200, body))

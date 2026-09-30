@@ -1,5 +1,5 @@
 // בדיקת הסוכן מהטרמינל בלי לשלוח הודעת וואטסאפ.
-// שימוש:  node scripts/ask.js "יש לכם רויאל קנין 2 קילו?"  [מספר-טלפון]
+// שימוש:  node scripts/ask.js "כמה עולה חדר פנורמי נובה ומה כולל הטיול לירח?"  [מספר-טלפון]
 import { answer } from '../src/agent.js';
 
 const text = process.argv[2];
