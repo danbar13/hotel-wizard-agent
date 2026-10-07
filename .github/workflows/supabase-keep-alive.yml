@@ -20,15 +20,15 @@ jobs:
             exit 1
           fi
           
-          echo "Sending keep-alive ping to Supabase..."
+          echo "Sending keep-alive ping to Supabase Database..."
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            "$SUPABASE_URL/rest/v1/")
+            "$SUPABASE_URL/rest/v1/conversations?select=chat_id&limit=1")
           
           echo "Response HTTP Status: $HTTP_STATUS"
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
-            echo "Successfully pinged Supabase!"
+            echo "Successfully pinged Supabase Database!"
           else
-            echo "Warning: Received unexpected status code $HTTP_STATUS, but activity was recorded."
+            echo "Warning: Received status code $HTTP_STATUS"
           fi
