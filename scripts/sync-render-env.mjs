@@ -18,9 +18,7 @@ const envVars = [
   { key: 'OWNER_NAME', value: env.OWNER_NAME || 'דני' },
   { key: 'OWNER_PHONE', value: env.OWNER_PHONE || '03-5551234' },
   { key: 'OWNER_WHATSAPP', value: env.OWNER_WHATSAPP || '972525340230' },
-  { key: 'SHOP_WHATSAPP', value: '972525340230' },
-  { key: 'SUPABASE_URL', value: env.SUPABASE_URL || '' },
-  { key: 'SUPABASE_KEY', value: env.SUPABASE_KEY || '' },
+  { key: 'SHOP_WHATSAPP', value: env.SHOP_WHATSAPP || '972774204022' },
 ];
 
 console.log('Syncing all env vars to Render...');
