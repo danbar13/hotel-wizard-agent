@@ -46,7 +46,7 @@ export default Object.freeze({
   },
   openrouter: {
     apiKey: process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY,
-    model: process.env.OPENROUTER_MODEL || (process.env.GEMINI_API_KEY ? 'gemini-2.5-flash' : 'openai/gpt-5.6-terra'),
+    model: process.env.OPENROUTER_MODEL || (process.env.GEMINI_API_KEY ? 'gemini-3.5-flash-lite' : 'openai/gpt-5.6-terra'),
     baseUrl:
       process.env.OPENROUTER_BASE_URL ||
       (process.env.GEMINI_API_KEY
